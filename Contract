@@ -1,0 +1,51 @@
+pragma solidity ^0.5.6;
+
+contract Contract{
+    function hello() pure public 
+        returns(string memory){
+        return "Hello Ethereum";
+    }
+    string dataInBlockchain;
+    function getData() view public 
+        returns(string memory){
+        return dataInBlockchain;
+    }
+    function setData(string memory data) 
+    public{
+        dataInBlockchain = data;
+    }
+    
+    enum State { Paused, Play}
+    State public currentState;
+    address owner;
+    constructor() public{
+        currentState = State.Paused;
+        owner = msg.sender;
+    }
+    modifier onlyOwner(){
+        require(msg.sender == owner);
+        _;
+    }
+    function play() public onlyOwner{
+        currentState = State.Play;    
+    }
+    uint[] public ids;
+    function getId(uint index) 
+        view public returns(uint){
+            return ids[index];    
+        }
+    function getAllIds()
+        view public returns(uint[] memory){
+            return ids;
+        }
+    function addId(uint id) public{
+        ids.push(id);
+    }
+    struct User{
+        string name;
+        string phone;
+    }
+    //User [] users;
+    mapping(address => User) users;
+    
+}
