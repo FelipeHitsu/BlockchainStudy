@@ -1,0 +1,164 @@
+pragma solidity ^0.5.6;
+
+import "./Token.sol";
+import "github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC721/ERC721Full.sol";
+import "github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/ownership/Ownable.sol";
+
+
+
+contract WeaponToken is ERC721Full, Ownable {
+  event NewWeapon(uint weaponId, string name, uint dna);
+
+  uint dnaDigits = 16;
+  uint dnaModulus = 10 ** dnaDigits;
+  
+  uint creationUpFee = 1;
+  uint createFeeCorrected = 1;
+  
+  struct Weapon {
+    string name;
+    uint256 dna;
+    uint64 birthTime;
+  }
+  
+event WeaponPutToSale(uint weapon_id, uint price);
+event WeaponBought(uint weapon_id);
+event WeaponPutToAuctions(uint weapon_id, uint price, uint duration);
+event NewHigherBidderOnWeponOnAuction(uint weapon_id, address bidder);
+  
+  constructor() public ERC721Full("WeaponToken","WEAPON"){
+      
+  }
+
+
+  Weapon[] public weapons;
+  mapping (uint => address payable) public weaponIndexToOwner;
+  mapping (address => uint) ownerWeaponCount;
+    // Declaring references to the Token contract
+    Token myToken;
+
+    // Attribute writter in order to set to a updated instance of the Token Contract
+    function setTokenAddress(address payable _address) external onlyOwner {
+      myToken = Token(_address);
+    }
+  function _createWeapon(string memory _name, uint _dna)  public{
+    uint id = weapons.push(Weapon(_name, _dna,uint64(now))) - 1;
+    weaponIndexToOwner[id] = msg.sender;
+    ownerWeaponCount[msg.sender]++;
+    emit NewWeapon(id, _name, _dna);
+  }
+  function _generateRandomDna(string memory _str) private view returns (uint) {
+    uint rand = uint(keccak256(abi.encodePacked(_str)));
+    return rand % dnaModulus;
+  }
+
+
+  function getWeaponData(uint weaponId) external view returns(string memory, uint256,uint64) {
+    return (weapons[weaponId].name,weapons[weaponId].dna,weapons[weaponId].birthTime);
+  }
+  
+  modifier haveBalance{
+    require(myToken.balanceOf(msg.sender) >= creationUpFee);
+    _;
+  }
+  
+  function buyWeapon(string calldata _name)  external haveBalance{
+      myToken.Pay(msg.sender,createFeeCorrected);
+      createFeeCorrected = createFeeCorrected + creationUpFee;
+       _createWeapon(_name,_generateRandomDna(_name));
+  }
+  
+  function mixWeaponDna(string calldata _name,uint weaponId, uint weaponId2)external payable{
+    require(msg.sender == weaponIndexToOwner[weaponId]);
+    require(msg.sender == weaponIndexToOwner[weaponId2]);
+    Weapon storage myWeapon = weapons[weaponId];
+    Weapon storage myWeapon2 = weapons[weaponId2];
+    myWeapon.dna += myWeapon2.dna % dnaModulus;
+    uint newWeaponDna = (myWeapon.dna) / 2;
+    _createWeapon(_name, newWeaponDna);
+
+  }
+    // Auction 
+    
+    uint transactionFeePercentage = 20;
+    
+    mapping(uint => uint)weaponPrice;
+    function putWeaponToSell(uint _weaponId, uint _price) external {
+        require(msg.sender == weaponIndexToOwner[_weaponId]);
+        weaponPrice[_weaponId] = _price;
+        emit WeaponPutToSale(_weaponId, _price);
+    }
+    
+    function buyWeaponOnSale(uint _weaponId) external payable {
+        // The msg.sender has to send more than the weapon's price
+        require(weaponPrice[_weaponId] != 0);
+        require(msg.value >= weaponPrice[_weaponId]);
+        
+        // Calculating if he sent more than he needed, to return to him
+        uint excedingEther = msg.value - weaponPrice[_weaponId];
+        msg.sender.transfer(excedingEther);
+        
+        // Calculate fees and apply the money transferences
+        address oldOwner = weaponIndexToOwner[_weaponId];
+        uint _fee =  weaponPrice[_weaponId] * (transactionFeePercentage / 100);
+        weaponIndexToOwner[_weaponId].transfer(weaponPrice[_weaponId] - _fee);
+        
+        // Decrement weapon counter from old owner
+        ownerWeaponCount[weaponIndexToOwner[_weaponId]]--;
+        // Set the new owner and increments his weapon counter
+        weaponIndexToOwner[_weaponId] = msg.sender;
+        ownerWeaponCount[msg.sender]++;
+        
+        // Remove weapon from sales references
+        delete weaponPrice[_weaponId];
+        
+        emit WeaponBought(_weaponId);
+        emit Transfer(oldOwner, msg.sender, _weaponId);
+    }
+    
+    mapping(uint => uint)auctionEndtime;
+    function putWeaponToAuctions(uint _weaponId, uint _minimalPrice, uint _duration) external {
+        require(msg.sender == weaponIndexToOwner[_weaponId]);
+        weaponPrice[_weaponId] = _minimalPrice;
+        uint64 time = uint64(now);
+        auctionEndtime[_weaponId] = _duration + time;
+        emit WeaponPutToAuctions(_weaponId, _minimalPrice, _duration);
+    }
+    
+    mapping(uint => address)auctionHigherBidder;
+    function bidOnWeaponAuction(uint _weaponId, uint _value_bid) external payable {
+        uint64 time = uint64(now);
+        require(auctionEndtime[_weaponId] > time);
+        require(myToken.balanceOf(msg.sender) >= _value_bid);
+        
+        if (weaponPrice[_weaponId] < _value_bid) {
+            weaponPrice[_weaponId] = _value_bid;
+            auctionHigherBidder[_weaponId] = msg.sender;
+            emit NewHigherBidderOnWeponOnAuction(_weaponId, msg.sender);
+        }
+    }
+    
+    function EndAuctionAndTransferProperty(uint _weaponId) external {
+        // Calculate fees and apply the money transferences
+        address oldOwner = weaponIndexToOwner[_weaponId];
+        uint _fee =  weaponPrice[_weaponId] * (transactionFeePercentage / 100);
+        
+        myToken.transferFromTo(auctionHigherBidder[_weaponId], weaponIndexToOwner[_weaponId], weaponPrice[_weaponId] - _fee);
+        
+        // Decrement weapon counter from old owner
+        ownerWeaponCount[weaponIndexToOwner[_weaponId]]--;
+        // Set the new owner and increments his weapon counter
+        weaponIndexToOwner[_weaponId] = msg.sender;
+        ownerWeaponCount[msg.sender]++;
+        
+        // Remove weapon from sales references
+        delete weaponPrice[_weaponId];
+        delete auctionHigherBidder[_weaponId];
+        delete auctionEndtime[_weaponId];
+        
+        emit WeaponBought(_weaponId);
+        emit Transfer(oldOwner, msg.sender, _weaponId);
+    }
+}
+  
+
