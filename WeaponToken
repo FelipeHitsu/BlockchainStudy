@@ -15,16 +15,20 @@ contract WeaponToken is ERC721Full, Ownable {
   uint creationUpFee = 1;
   uint createFeeCorrected = 1;
   
+  uint _feePercentage = 20;
+  
+  event SellWeapon(uint weapon_id, uint price);
+  event RemoveWeaponOfSale(uint weapon_id);
+  event auctMyWeapon(uint weapon_id, uint price, uint duration);
+  event NewWinner(uint weapon_id, address bidder);
+  
+  
+  
   struct Weapon {
     string name;
     uint256 dna;
     uint64 birthTime;
   }
-  
-event WeaponPutToSale(uint weapon_id, uint price);
-event WeaponBought(uint weapon_id);
-event WeaponPutToAuctions(uint weapon_id, uint price, uint duration);
-event NewHigherBidderOnWeponOnAuction(uint weapon_id, address bidder);
   
   constructor() public ERC721Full("WeaponToken","WEAPON"){
       
@@ -78,27 +82,25 @@ event NewHigherBidderOnWeponOnAuction(uint weapon_id, address bidder);
     _createWeapon(_name, newWeaponDna);
 
   }
-    // Auction 
     
-    uint transactionFeePercentage = 20;
     
     mapping(uint => uint)weaponPrice;
     function sellWeapon(uint _weaponId, uint _price) external {
         require(msg.sender == weaponIndexToOwner[_weaponId]);
         weaponPrice[_weaponId] = _price;
-        emit WeaponPutToSale(_weaponId, _price);
+        emit SellWeapon(_weaponId, _price);
     }
     
-    function buyWeaponOS(uint _weaponId) external payable {
+    function BuyWeapon(uint _weaponId) external payable {
         require(weaponPrice[_weaponId] != 0);
         require(msg.value >= weaponPrice[_weaponId]);
         
-        uint excedingEther = msg.value - weaponPrice[_weaponId];
-        msg.sender.transfer(excedingEther);
+        uint extraValue = msg.value - weaponPrice[_weaponId];
+        msg.sender.transfer(extraValue);
         
         address oldOwner = weaponIndexToOwner[_weaponId];
-        uint _fee =  weaponPrice[_weaponId] * (transactionFeePercentage / 100);
-        weaponIndexToOwner[_weaponId].transfer(weaponPrice[_weaponId] - _fee);
+        uint _feeValue =  weaponPrice[_weaponId] * (_feePercentage / 100);
+        weaponIndexToOwner[_weaponId].transfer(weaponPrice[_weaponId] - _feeValue);
         
         ownerWeaponCount[weaponIndexToOwner[_weaponId]]--;
         weaponIndexToOwner[_weaponId] = msg.sender;
@@ -107,49 +109,47 @@ event NewHigherBidderOnWeponOnAuction(uint weapon_id, address bidder);
         
 	delete weaponPrice[_weaponId];
         
-        emit WeaponBought(_weaponId);
+        emit RemoveWeaponOfSale(_weaponId);
         emit Transfer(oldOwner, msg.sender, _weaponId);
     }
     
-    mapping(uint => uint)auctionEndtime;
-    function auctWeapon(uint _weaponId, uint _minimalPrice, uint _duration) external {
+    mapping(uint => uint)auctionTime;
+    function auctMyWeapon(uint _weaponId, uint _minimalPrice, uint _duration) external {
         require(msg.sender == weaponIndexToOwner[_weaponId]);
         weaponPrice[_weaponId] = _minimalPrice;
         uint64 time = uint64(now);
-        auctionEndtime[_weaponId] = _duration + time;
-        emit WeaponPutToAuctions(_weaponId, _minimalPrice, _duration);
+        auctionTime[_weaponId] = _duration + time;
+        emit auctMyWeapon(_weaponId, _minimalPrice, _duration);
     }
     
-    mapping(uint => address)auctionHigherBidder;
-    function bidAuction(uint _weaponId, uint _value_bid) external payable {
+    mapping(uint => address)actualWinner;
+    function Bid(uint _weaponId, uint _value) external payable {
         uint64 time = uint64(now);
-        require(auctionEndtime[_weaponId] > time);
-        require(myToken.balanceOf(msg.sender) >= _value_bid);
+        require(auctionTime[_weaponId] > time);
+        require(myToken.balanceOf(msg.sender) >= _value);
         
-        if (weaponPrice[_weaponId] < _value_bid) {
-            weaponPrice[_weaponId] = _value_bid;
-            auctionHigherBidder[_weaponId] = msg.sender;
-            emit NewHigherBidderOnWeponOnAuction(_weaponId, msg.sender);
+        if (weaponPrice[_weaponId] < _value) {
+            weaponPrice[_weaponId] = _value;
+            actualWinner[_weaponId] = msg.sender;
+            emit NewWinner(_weaponId, msg.sender);
         }
     }
     
-    function EndAndTransfer(uint _weaponId) external {
+    function Finish(uint _weaponId) external {
         address oldOwner = weaponIndexToOwner[_weaponId];
-        uint _fee =  weaponPrice[_weaponId] * (transactionFeePercentage / 100);
+        uint _feeValue =  weaponPrice[_weaponId] * (_feePercentage / 100);
         
-        myToken.transferFromTo(auctionHigherBidder[_weaponId], weaponIndexToOwner[_weaponId], weaponPrice[_weaponId] - _fee);
+        myToken.transferFromTo(actualWinner[_weaponId], weaponIndexToOwner[_weaponId], weaponPrice[_weaponId] - _feeValue);
         
         ownerWeaponCount[weaponIndexToOwner[_weaponId]]--;
         weaponIndexToOwner[_weaponId] = msg.sender;
         ownerWeaponCount[msg.sender]++;
         
         delete weaponPrice[_weaponId];
-        delete auctionHigherBidder[_weaponId];
-        delete auctionEndtime[_weaponId];
+        delete actualWinner[_weaponId];
+        delete auctionTime[_weaponId];
         
-        emit WeaponBought(_weaponId);
+        emit RemoveWeaponOfSale(_weaponId);
         emit Transfer(oldOwner, msg.sender, _weaponId);
     }
 }
-  
-
