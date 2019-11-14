@@ -9,14 +9,21 @@ import "github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/own
 contract WeaponToken is ERC721Full, Ownable {
   event NewWeapon(uint weaponId, string name, uint dna);
 
+  //Dna and Creation
   uint dnaDigits = 16;
   uint dnaModulus = 10 ** dnaDigits;
-  
   uint creationUpFee = 1;
   uint createFeeCorrected = 1;
   
-  uint _feePercentage = 20;
+  //Selling Fee
+  uint _feePercentage = 15;
   
+  //mapping
+  mapping(uint => uint)weaponPrice;
+  mapping(uint => uint)auctionTime;
+  mapping(uint => address)actualWinner;
+
+  //Sell Events
   event SellWeapon(uint weapon_id, uint price);
   event RemoveWeaponOfSale(uint weapon_id);
   event auctMyWeapon(uint weapon_id, uint price, uint duration);
@@ -84,7 +91,27 @@ contract WeaponToken is ERC721Full, Ownable {
   }
     
     
-    mapping(uint => uint)weaponPrice;
+    function AuctMyWeapon(uint _weaponId, uint _minimalPrice, uint _duration) external {
+        require(msg.sender == weaponIndexToOwner[_weaponId]);
+        weaponPrice[_weaponId] = _minimalPrice;
+        uint64 time = uint64(now);
+        auctionTime[_weaponId] = _duration + time;
+        emit auctMyWeapon(_weaponId, _minimalPrice, _duration);
+    }
+    
+    
+    function Bid(uint _weaponId, uint _value) external payable {
+        uint64 time = uint64(now);
+        require(auctionTime[_weaponId] > time);
+        require(myToken.balanceOf(msg.sender) >= _value);
+        
+        if (weaponPrice[_weaponId] < _value) {
+            weaponPrice[_weaponId] = _value;
+            actualWinner[_weaponId] = msg.sender;
+            emit NewWinner(_weaponId, msg.sender);
+        }
+    }
+    
     function sellWeapon(uint _weaponId, uint _price) external {
         require(msg.sender == weaponIndexToOwner[_weaponId]);
         weaponPrice[_weaponId] = _price;
@@ -93,9 +120,9 @@ contract WeaponToken is ERC721Full, Ownable {
     
     function BuyWeapon(uint _weaponId) external payable {
         require(weaponPrice[_weaponId] != 0);
-        require(msg.value >= weaponPrice[_weaponId]);
+        require(balanceOf(msg.sender) >= weaponPrice[_weaponId]);
         
-        uint extraValue = msg.value - weaponPrice[_weaponId];
+        uint extraValue = balanceOf(msg.sender) - weaponPrice[_weaponId];
         msg.sender.transfer(extraValue);
         
         address oldOwner = weaponIndexToOwner[_weaponId];
@@ -111,28 +138,6 @@ contract WeaponToken is ERC721Full, Ownable {
         
         emit RemoveWeaponOfSale(_weaponId);
         emit Transfer(oldOwner, msg.sender, _weaponId);
-    }
-    
-    mapping(uint => uint)auctionTime;
-    function auctMyWeapon(uint _weaponId, uint _minimalPrice, uint _duration) external {
-        require(msg.sender == weaponIndexToOwner[_weaponId]);
-        weaponPrice[_weaponId] = _minimalPrice;
-        uint64 time = uint64(now);
-        auctionTime[_weaponId] = _duration + time;
-        emit auctMyWeapon(_weaponId, _minimalPrice, _duration);
-    }
-    
-    mapping(uint => address)actualWinner;
-    function Bid(uint _weaponId, uint _value) external payable {
-        uint64 time = uint64(now);
-        require(auctionTime[_weaponId] > time);
-        require(myToken.balanceOf(msg.sender) >= _value);
-        
-        if (weaponPrice[_weaponId] < _value) {
-            weaponPrice[_weaponId] = _value;
-            actualWinner[_weaponId] = msg.sender;
-            emit NewWinner(_weaponId, msg.sender);
-        }
     }
     
     function Finish(uint _weaponId) external {
