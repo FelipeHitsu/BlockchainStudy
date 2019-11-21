@@ -6,19 +6,12 @@
     <script language="javascript" type="text/javascript" src="./web3.min.js"></script>
     <script Language="javascript" type="text/javascript" src="./abi.js"></script>
     <script type="text/javascript">
-
         var myContract;
-
         var userAccount;
-
         var web3js;
-
-
         function startApp() {
-            var address = "0x2169C3A7cF448E6D41A2a4a0a6f0b497D05999a8";
-
+            var address = "0x394E7c0F0388215Eeb4201303b689E6Cf959Ac3C";
             myContract = new web3js.eth.Contract(abi, address);
-
             web3.eth.getAccounts(function(error, accounts) {
                 userAccount = accounts[0];
                 if (typeof userAccount !== 'undefined'){
@@ -28,14 +21,10 @@
                     console.log(error);
                 }
             });
-
         }
-
-
         function getWeaponDetails(id) {
             return myContract.methods.weapons(id).call()
         }
-
         window.addEventListener('load', async () => {
             // Modern dapp browsers...
             if (window.ethereum) {
@@ -44,7 +33,6 @@
                     // Request account access if needed
                     await ethereum.enable();
                     web3js = new Web3(web3.currentProvider);
-
                 } catch (error) {
                     // User denied account access...
                 }
@@ -60,32 +48,42 @@
             }
             startApp()
         });
-
         function BuyWeaponTest(){
+            var name = document.getElementById("weaponBuy").value;
             if (typeof userAccount !== 'undefined') {
-                myContract.methods.buyWeapon("teste").send({
+                myContract.methods.buyWeapon(name).send({
                     from: userAccount,
-                    value: web3js.utils.toWei("0.001", "ether")
-                });
+                    gas:8000000
+                })
             }else{
                 console.log('No userAccount Detected... ERROR!!!')
             }
-
         }
 
         function getWeaponTest(){
-            myContract.methods.weapons(0).call()
+            var wid = document.getElementById("getWeaponId").value;
+            myContract.methods.weapons(wid).call()
                 .then(function(result) {
                     console.log("0: " + JSON.stringify(result));
+                    document.getElementById("getWeaponIdOutput").innerHTML = result.name;
                 });
         }
 
-
+        function mixWeaponDna(){
+            var name = document.getElementById("weaponMixName").value;
+            var wId1 = document.getElementById("weaponMix1").value;
+            var wId2 = document.getElementById("weaponMix2").value;
+            myContract.methods.mixWeaponDna(name,wId1,wId2).send({
+                    from: userAccount,
+                    gas:8000000
+                })
+        }
     </script>
 </head>
 <body>
-<button type="button" onClick="contractAddress();">Set adress</button>
-<input type = "text" id = "setAdress" value = " 0 ">
+
+<button type="button" onClick="BuyWeaponTest();">Buy Weapon</button>
+<input type="text" id = "weaponBuy" value="Weapon name">
 </br>
 
 <button type="button" onClick="getWeaponTest();">Get Weapon</button>
@@ -93,13 +91,10 @@
 <p id= "getWeaponIdOutput"> </p>
 </br>
 
-<button type="button" onClick="BuyWeaponTest();">Buy Weapon</button>
-<input type="text" id = "weaponBuy" value="Weapon name">
-</br>
-
 <button type="button" onClick="mixWeaponDna();"> Mix Weapon Dna </button>
-<input type="text" id = "weaponMix1" value="Id weapon 1 ">
-<input type="text" id = "weaponMix2" value="Id weapon 2">
+<input type="text" id = "weaponMix1" value="ID Weapon 1 ">
+<input type="text" id = "weaponMix2" value="ID Weapon 2">
 <input type="text" id = "weaponMixName" value="MixWeapon name">
+
 </body>
 </html>
