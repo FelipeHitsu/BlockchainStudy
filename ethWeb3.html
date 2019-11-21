@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Front-end</title>
+    <script language="javascript" type="text/javascript" src="./web3.min.js"></script>
+    <script Language="javascript" type="text/javascript" src="./abi.js"></script>
+    <script type="text/javascript">
+
+        var myContract;
+
+        var userAccount;
+
+        var web3js;
+
+
+        function startApp() {
+            var address = "0x2169C3A7cF448E6D41A2a4a0a6f0b497D05999a8";
+
+            myContract = new web3js.eth.Contract(abi, address);
+
+            web3.eth.getAccounts(function(error, accounts) {
+                userAccount = accounts[0];
+                if (typeof userAccount !== 'undefined'){
+                    console.log('userAccount Detected');
+                }else{
+                    console.log('No userAccount Detected... ERROR!!!');
+                    console.log(error);
+                }
+            });
+
+        }
+
+
+        function getWeaponDetails(id) {
+            return myContract.methods.weapons(id).call()
+        }
+
+        window.addEventListener('load', async () => {
+            // Modern dapp browsers...
+            if (window.ethereum) {
+                window.web3 = new Web3(ethereum);
+                try {
+                    // Request account access if needed
+                    await ethereum.enable();
+                    web3js = new Web3(web3.currentProvider);
+
+                } catch (error) {
+                    // User denied account access...
+                }
+            }
+            // Legacy dapp browsers...
+            else if (window.web3) {
+                window.web3 = new Web3(web3.currentProvider);
+                // Acccounts always exposed
+            }
+            // Non-dapp browsers...
+            else {
+                console.log('Non-Ethereum browser detected. You should consider trying MetaMask!');
+            }
+            startApp()
+        });
+
+        function BuyWeaponTest(){
+            if (typeof userAccount !== 'undefined') {
+                myContract.methods.buyWeapon("teste").send({
+                    from: userAccount,
+                    value: web3js.utils.toWei("0.001", "ether")
+                });
+            }else{
+                console.log('No userAccount Detected... ERROR!!!')
+            }
+
+        }
+
+        function getWeaponTest(){
+            myContract.methods.weapons(0).call()
+                .then(function(result) {
+                    console.log("0: " + JSON.stringify(result));
+                });
+        }
+
+
+    </script>
+</head>
+<body>
+<button type="button" onClick="contractAddress();">Set adress</button>
+<input type = "text" id = "setAdress" value = " 0 ">
+</br>
+
+<button type="button" onClick="getWeaponTest();">Get Weapon</button>
+<input type = "text" id = "getWeaponId" value = " 0 ">
+<p id= "getWeaponIdOutput"> </p>
+</br>
+
+<button type="button" onClick="BuyWeaponTest();">Buy Weapon</button>
+<input type="text" id = "weaponBuy" value="Weapon name">
+</br>
+
+<button type="button" onClick="mixWeaponDna();"> Mix Weapon Dna </button>
+<input type="text" id = "weaponMix1" value="Id weapon 1 ">
+<input type="text" id = "weaponMix2" value="Id weapon 2">
+<input type="text" id = "weaponMixName" value="MixWeapon name">
+</body>
+</html>
